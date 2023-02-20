@@ -1,0 +1,97 @@
+#include <ESP8266WiFi.h>
+#include <EEPROM.h>
+
+
+const int flowPin = D2;    //This is the input pin on the Arduino
+float flowRate; //This is the value we intend to calculate.
+float liters;
+int count=0;
+ 
+const char* ssid     = "Praps_Kingdom";
+const char* password = "praps131";
+const char* host = "watermeter333.000webhostapp.com";
+
+
+void setup() {
+   pinMode(flowPin, INPUT);           //Sets the pin as an inp
+  attachInterrupt(digitalPinToInterrupt(flowPin), Flow, RISING);  //Configures interrupt 0 (pin 2 on the Arduino Uno) to run the function "Flow"  
+  Serial.begin(115200);  //Start Serial
+
+ 
+  Serial.println();
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  
+  WiFi.begin(ssid, password); 
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+ 
+  Serial.println("");
+  Serial.println("WiFi connected");  
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("Netmask: ");
+  Serial.println(WiFi.subnetMask());
+  Serial.print("Gateway: ");
+  Serial.println(WiFi.gatewayIP());
+}
+
+void loop() {
+
+   count = 0;      // Reset the counter so we start counting from 0 again
+  interrupts();   //Enables interrupts on the Arduino
+  delay (1000);   //Wait 1 second 
+  noInterrupts(); //Disable the interrupts on the Arduino
+  
+  //Start the math
+ flowRate = (count * 2.25);        //Take counted pulses in the last second and multiply by 2.25mL
+ flowRate = flowRate / 1000 ;       //Convert mL to Liters, giving you Liters / Minute
+ float h = flowRate;
+
+ if ( h>0 )
+ {
+  Serial.println(flowRate);         //Print the variable flowRate to Serial
+ 
+  int t = 333;
+  if (isnan(h)) {
+    Serial.println("Failed to read from flow sensor!");
+    return;
+  }
+
+  Serial.print("connecting to ");
+  Serial.println(host);
+
+  WiFiClient client;
+  const int httpPort = 80;
+  if (!client.connect(host, httpPort)) {
+    Serial.println("connection failed");
+    return;
+  }
+  
+  String url = "/api/insert.php?cid=" + String(t) + "&data="+ String(h);
+  Serial.print("Requesting URL: ");
+  Serial.println(url);
+  
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: " + host + "\r\n" + 
+               "Connection: close\r\n\r\n");
+  delay(500);
+  
+  while(client.available()){
+    String line = client.readStringUntil('\r');
+    Serial.print(line);
+  }
+  
+  Serial.println();
+  Serial.println("closing connection");
+  delay(3000);
+ }
+}
+
+void Flow()
+{
+   count++; //Every time this function is called, increment "count" by 1
+}
